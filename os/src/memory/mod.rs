@@ -16,6 +16,27 @@
  * ============================================
  */
 
+// ============================================
+// 子模块
+// ============================================
+
+pub mod paging;
+pub mod address_space;
+
+// 重新导出页表管理函数
+pub use paging::{
+    walk_page_table, walk_page_table_verbose,
+    map_page, map_page_verbose,
+    unmap_page,
+    translate_addr as translate_addr_current
+};
+
+// 重新导出地址空间相关类型
+pub use address_space::{
+    AddressSpace, MemoryArea, MemoryAreaType,
+    create_kernel_address_space
+};
+
 /// 页大小（4KB）
 pub const PAGE_SIZE: usize = 4096;
 
