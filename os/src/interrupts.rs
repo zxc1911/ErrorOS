@@ -227,7 +227,7 @@ fn illegal_instruction_handler(sepc: usize, stval: usize) {
     );
 }
 
-/// 系统调用处理（预留接口）
+/// 系统调用处理
 ///
 /// # 参数
 /// - `sepc`: 系统调用发生时的程序计数器
@@ -237,12 +237,18 @@ fn illegal_instruction_handler(sepc: usize, stval: usize) {
 /// 系统调用号和参数通过寄存器传递：
 /// - a7: 系统调用号
 /// - a0-a5: 参数
+/// - a0: 返回值
 fn syscall_handler(sepc: usize) {
-    serial_println!("[SYSCALL] System call at {:#x}", sepc);
+    // 从寄存器读取系统调用上下文
+    let context = unsafe { crate::syscall::SyscallContext::from_registers() };
 
-    // 这里可以添加系统调用分发逻辑
-    // 读取 a7 寄存器获取系统调用号
-    // 读取 a0-a5 寄存器获取参数
+    // 调用系统调用分发器
+    let result = crate::syscall::syscall_dispatcher(&context);
+
+    // 设置返回值到 a0 寄存器
+    unsafe {
+        context.set_return_value(result);
+    }
 
     // 系统调用返回后需要跳过 ecall 指令
     riscv::register::sepc::write(sepc + 4); // ecall 是 4 字节指令

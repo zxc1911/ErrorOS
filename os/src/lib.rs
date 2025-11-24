@@ -34,6 +34,7 @@ pub mod interrupts;  // 中断和异常处理
 pub mod memory;      // 内存管理
 pub mod allocator;   // 堆分配器
 pub mod task;        // 异步任务系统
+pub mod syscall;     // 系统调用
 
 // ============================================
 // 外部 crate

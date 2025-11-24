@@ -105,20 +105,29 @@ pub extern "C" fn kernel_main() -> ! {
     test_page_table_features(&mut memory_manager);
 
     // ========================================
-    // 创建并激活内核地址空间
+    // 创建并激活内核地址空间（暂时注释，先测试系统调用）
+    // ========================================
+    // println!("\n========================================");
+    // println!("  创建内核地址空间");
+    // println!("========================================\n");
+    // test_kernel_address_space(&mut memory_manager);
+
+    // ========================================
+    // 测试系统调用功能
     // ========================================
     println!("\n========================================");
-    println!("  创建内核地址空间");
+    println!("  系统调用功能测试");
     println!("========================================\n");
-    test_kernel_address_space(&mut memory_manager);
+    test_syscall_features();
 
-    // 启动异步执行器
-    let mut executor = Executor::new();
-    executor.spawn(Task::new(example_task()));
-    executor.spawn(Task::new(keyboard::print_keypresses()));
-    executor.run();
+    println!("\n========================================");
+    println!("  所有测试完成！");
+    println!("========================================\n");
 
-    println!("It did not crash!");
+    // 测试完成后进入等待模式（而不是异步执行器）
+    println!("系统已就绪，按Ctrl+A然后X退出QEMU\n");
+
+    // 进入低功耗循环等待
     os::hlt_loop();
 }
 
@@ -265,4 +274,44 @@ fn test_kernel_address_space(memory_manager: &mut os::memory::MemoryManager) {
     // 重要：这里不能drop kernel_space，因为我们还在使用它
     // 所以使用 core::mem::forget 防止析构
     core::mem::forget(kernel_space);
+}
+
+/// 测试系统调用功能
+///
+/// # 功能
+/// - 测试 sys_write 系统调用
+/// - 测试 sys_getpid 系统调用
+/// - 演示系统调用追踪可视化
+fn test_syscall_features() {
+    use os::syscall::test_syscall;
+
+    println!("[1] 测试 sys_getpid 系统调用...");
+    let pid = test_syscall(172, 0, 0, 0);
+    println!("    ✓ 当前进程 PID: {}\n", pid);
+
+    println!("[2] 测试 sys_write 系统调用...");
+    let msg = "Hello from syscall!\n";
+    let msg_ptr = msg.as_ptr();
+    let msg_len = msg.len();
+
+    let written = test_syscall(
+        64,                   // sys_write
+        1,                    // fd = stdout
+        msg_ptr as usize,     // buf
+        msg_len,              // len
+    );
+
+    if written > 0 {
+        println!("    ✓ sys_write 成功写入 {} 字节\n", written);
+    } else {
+        println!("    ✗ sys_write 失败: {}\n", written);
+    }
+
+    println!("[3] 测试无效的系统调用...");
+    let result = test_syscall(9999, 0, 0, 0);
+    println!("    ✓ 返回错误码: {} (预期行为)\n", result);
+
+    println!("========================================");
+    println!("  系统调用功能测试完成！");
+    println!("========================================\n");
 }

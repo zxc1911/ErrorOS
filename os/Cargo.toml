@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 authors = ["RISC-V OS Project"]
 
+[features]
+default = []
+verbose_syscall = []  # 系统调用可视化输出
+
 [profile.dev]
 panic = "abort"
 
