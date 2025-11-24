@@ -88,10 +88,4 @@ feat: 实现 RISC-V Sv39 虚拟内存系统（可视化教学版）
 - ✅ 地址转换结果正确
 - ✅ 虚拟内存激活后系统稳定运行
 - ✅ 所有可视化输出清晰易懂
-
-🤖 Generated with Claude Code
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-EOF
-)"
 ```
