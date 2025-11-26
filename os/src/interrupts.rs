@@ -115,8 +115,12 @@ pub extern "C" fn trap_handler() {
                     illegal_instruction_handler(sepc, stval);
                 }
                 Exception::UserEnvCall => {
-                    // 系统调用处理入口（预留）
-                    syscall_handler(sepc);
+                    // 系统调用处理入口（预留，暂未实现）
+                    panic!(
+                        "System call not implemented!\n\
+                        sepc: {:#x}",
+                        sepc
+                    );
                 }
                 _ => {
                     panic!(
@@ -225,33 +229,6 @@ fn illegal_instruction_handler(sepc: usize, stval: usize) {
         sepc,
         stval
     );
-}
-
-/// 系统调用处理
-///
-/// # 参数
-/// - `sepc`: 系统调用发生时的程序计数器
-///
-/// # 说明
-/// 用户态程序通过 ecall 指令触发
-/// 系统调用号和参数通过寄存器传递：
-/// - a7: 系统调用号
-/// - a0-a5: 参数
-/// - a0: 返回值
-fn syscall_handler(sepc: usize) {
-    // 从寄存器读取系统调用上下文
-    let context = unsafe { crate::syscall::SyscallContext::from_registers() };
-
-    // 调用系统调用分发器
-    let result = crate::syscall::syscall_dispatcher(&context);
-
-    // 设置返回值到 a0 寄存器
-    unsafe {
-        context.set_return_value(result);
-    }
-
-    // 系统调用返回后需要跳过 ecall 指令
-    riscv::register::sepc::write(sepc + 4); // ecall 是 4 字节指令
 }
 
 // ============================================

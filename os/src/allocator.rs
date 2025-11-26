@@ -65,7 +65,35 @@ fn align_up(addr: usize, align: usize) -> usize {
     (addr + align - 1) & !(align - 1)
 }
 
-/// 初始化堆分配器
+/// 初始化堆分配器（简单版本，不需要虚拟内存）
+///
+/// # 功能
+/// - 直接在物理内存中初始化堆
+/// - 不需要页表或虚拟内存支持
+///
+/// # 参数
+/// - `kernel_end_addr`: 内核结束地址
+pub fn init_heap_simple(
+    kernel_end_addr: usize,
+) -> Result<(), &'static str> {
+    use crate::serial_println;
+
+    // 将堆起始地址设置为内核结束地址之后，对齐到 4KB
+    let heap_start = align_up(kernel_end_addr, 4096);
+
+    serial_println!("[ALLOCATOR] Initializing heap at {:#x}", heap_start);
+    serial_println!("[ALLOCATOR] Heap size: {} bytes", HEAP_SIZE);
+
+    // 初始化分配器
+    unsafe {
+        ALLOCATOR.lock().init(heap_start, HEAP_SIZE);
+    }
+
+    serial_println!("[ALLOCATOR] Heap initialized successfully");
+    Ok(())
+}
+
+/// 初始化堆分配器（完整版本，需要虚拟内存）
 ///
 /// # 功能
 /// - 为堆区域分配物理帧
@@ -74,6 +102,18 @@ fn align_up(addr: usize, align: usize) -> usize {
 ///
 /// # 参数
 /// - `frame_allocator`: 物理帧分配器
+///
+/// # 注意
+/// 此函数需要虚拟内存模块支持，当前已禁用
+#[allow(dead_code)]
+pub fn init_heap(
+    #[allow(unused_variables)] frame_allocator: &mut (),
+) -> Result<(), &'static str> {
+    Err("Virtual memory not implemented")
+}
+
+/*
+// 原始的 init_heap 实现（需要虚拟内存）
 pub fn init_heap(
     frame_allocator: &mut crate::memory::SimpleFrameAllocator,
 ) -> Result<(), &'static str> {
@@ -108,6 +148,7 @@ pub fn init_heap(
     serial_println!("[ALLOCATOR] Heap initialized successfully");
     Ok(())
 }
+*/
 
 // ============================================
 // 测试
