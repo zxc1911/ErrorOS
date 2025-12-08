@@ -1,0 +1,198 @@
+## 2.5异常分发器
+
+#### 根据 scause 分发异常
+
+现在我们实现核心的分发逻辑。在 `interrupts.rs` 中添加：
+
+```rust
+/// 陷阱分发器
+///
+/// # 参数
+/// - `ctx`: 陷阱上下文
+/// - `scause`: 陷阱原因
+/// - `stval`: 陷阱值
+/// - `sepc`: 异常 PC
+fn trap_dispatcher(
+    ctx: &mut TrapContext,
+    scause: scause::Scause,
+    stval: usize,
+    sepc: usize,
+) {
+    match scause.cause() {
+        // ============================================
+        // 中断处理
+        // ============================================
+        Trap::Interrupt(interrupt) => {
+            match interrupt {
+                Interrupt::SupervisorTimer => {
+                    timer_interrupt_handler();
+                }
+                Interrupt::SupervisorExternal => {
+                    external_interrupt_handler();
+                }
+                Interrupt::SupervisorSoft => {
+                    software_interrupt_handler();
+                }
+                _ => {
+                    panic!(
+                        "Unhandled interrupt: {:?}\nsepc: {:#x}\nstval: {:#x}",
+                        interrupt, sepc, stval
+                    );
+                }
+            }
+        }
+
+        // ============================================
+        // 异常处理
+        // ============================================
+        Trap::Exception(exception) => {
+            match exception {
+                Exception::Breakpoint => {
+                    breakpoint_handler(ctx);
+                }
+                Exception::IllegalInstruction => {
+                    illegal_instruction_handler(ctx, stval);
+                }
+                Exception::UserEnvCall => {
+                    syscall_handler(ctx);
+                }
+                Exception::LoadPageFault
+                | Exception::StorePageFault
+                | Exception::InstructionPageFault => {
+                    page_fault_handler(scause.cause(), stval, sepc);
+                }
+                _ => {
+                    panic!(
+                        "Unhandled exception: {:?}\nsepc: {:#x}\nstval: {:#x}",
+                        exception, sepc, stval
+                    );
+                }
+            }
+        }
+    }
+}
+```
+
+---
+
+#### 实现断点异常处理 (ebreak)
+
+断点异常通常用于调试。在 `interrupts.rs` 中添加：
+
+```rust
+/// 断点异常处理
+///
+/// # 参数
+/// - `ctx`: 陷阱上下文
+fn breakpoint_handler(ctx: &mut TrapContext) {
+    let sepc = ctx.sepc;
+
+    serial_println!("[EXCEPTION] Breakpoint at {:#x}", sepc);
+    println!("EXCEPTION: BREAKPOINT at {:#x}", sepc);
+
+    // 重要：更新 sepc，跳过 ebreak 指令
+    // ebreak 在压缩指令集中是 2 字节，在标准指令集中是 4 字节
+    // 这里我们假设使用压缩指令集
+    ctx.sepc = sepc + 2;
+}
+```
+
+**如何触发断点异常？**
+
+```rust
+// 在代码中插入
+unsafe {
+    core::arch::asm!("ebreak");
+}
+```
+
+---
+
+#### 实现非法指令异常处理
+
+非法指令异常发生在执行无效指令时。在 `interrupts.rs` 中添加：
+
+```rust
+/// 非法指令异常处理
+///
+/// # 参数
+/// - `ctx`: 陷阱上下文
+/// - `stval`: 非法指令的值
+fn illegal_instruction_handler(ctx: &mut TrapContext, stval: usize) {
+    let sepc = ctx.sepc;
+
+    panic!(
+        "EXCEPTION: ILLEGAL INSTRUCTION\n\
+        PC: {:#x}\n\
+        Instruction: {:#x}",
+        sepc, stval
+    );
+}
+```
+
+---
+
+#### 实现系统调用异常处理 (ecall)
+
+系统调用是用户程序请求内核服务的方式。在 `interrupts.rs` 中添加：
+
+```rust
+/// 系统调用处理
+///
+/// # 参数
+/// - `ctx`: 陷阱上下文
+///
+/// # 说明
+/// 系统调用参数：
+/// - a0-a6: 系统调用参数
+/// - a7: 系统调用号
+fn syscall_handler(ctx: &mut TrapContext) {
+    let sepc = ctx.sepc;
+
+    // 系统调用的具体实现在后续章节
+    // 这里只是占位
+    serial_println!("[SYSCALL] System call at {:#x}", sepc);
+
+    // 系统调用号在 a7 (x17)
+    let syscall_id = ctx.x[17];
+    serial_println!("[SYSCALL] ID: {}", syscall_id);
+
+    // 更新 sepc，跳过 ecall 指令（4 字节）
+    ctx.sepc = sepc + 4;
+
+    // 设置返回值（a0）
+    ctx.x[10] = 0; // 返回 0 表示成功
+}
+```
+
+---
+
+#### 实现页面错误处理（占位）
+
+页面错误在虚拟内存管理章节详细实现。这里先写一个占位版本：
+
+```rust
+/// 页面错误处理
+///
+/// # 参数
+/// - `cause`: 错误类型
+/// - `stval`: 触发错误的地址
+/// - `sepc`: 触发错误的 PC
+fn page_fault_handler(cause: Trap, stval: usize, sepc: usize) {
+    serial_println!(
+        "[EXCEPTION] Page Fault\n\
+        Type: {:?}\n\
+        Address: {:#x}\n\
+        PC: {:#x}",
+        cause, stval, sepc
+    );
+
+    println!("EXCEPTION: PAGE FAULT");
+    println!("  Accessed Address: {:#x}", stval);
+    println!("  Instruction PC: {:#x}", sepc);
+    println!("  Fault Type: {:?}", cause);
+
+    // 页面错误是严重错误，停止系统
+    crate::hlt_loop();
+}
+```
